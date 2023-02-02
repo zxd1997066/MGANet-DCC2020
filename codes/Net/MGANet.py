@@ -49,7 +49,7 @@ def crop_like(input, target):
 class Gen_Guided_UNet(nn.Module):
     expansion = 1
 
-    def __init__(self,batchNorm=True,input_size=[240,416],is_training=True):
+    def __init__(self,batchNorm=True,input_size=[240,416],is_training=False):
         super(Gen_Guided_UNet,self).__init__()
         self.batchNorm = batchNorm
         self.is_training = is_training
@@ -176,7 +176,7 @@ class Gen_Guided_UNet(nn.Module):
         image_finally = torch.clamp(image_finally,0.,1.)
         # print('image_1',image_finally.shape)
 
-        if self.is＿training:
+        if self.is_training:
             return image_4,image_3,image_2,image_1,image_finally
         else:
             return image_finally

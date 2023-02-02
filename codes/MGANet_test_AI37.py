@@ -79,7 +79,7 @@ def get_data(one_filename,video_index,num_frame,startfrm_position):
                 mask_37_filename_Y, mask_37_filename_U, mask_37_filename_V = yuv_import(filename=file_name, dims=dims,startfrm=startfrm_position, numframe=num_frame)
                 data_Y.append(mask_37_filename_Y)
         if i == 2:
-            label_37_filename = np.sort(glob.glob('../test_yuv/label/' + '*.yuv'))
+            label_37_filename = np.sort(glob.glob('./testing_set/label/' + '*.yuv'))
             label_37_filename_length = len(label_37_filename)
             for i_2 in range(video_index,video_index+1):
                 file_name = label_37_filename[i_2]
@@ -124,27 +124,25 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
         psnr_pre_gt_sum=0
         psnr_data_gt_sum=0
         nums =opt.frame_nums
-        for itr in range(0, nums):           
-            data_pre, data_cur, data_aft, mask, label, start = test_batch(data_Y=data_Y, start=start, batch_size=1)
+        for itr in range(0, nums):
+            data_pre, data_cur, data_aft, mask, label, start = test_batch(data_Y=data_Y, start=start, batch_size=opt.batch_size)
 
             height = data_pre.shape[2]
             width = data_pre.shape[3]
-           
-            data_pre_value_patch = torch.from_numpy(data_pre).float().cuda()
 
-            data_cur_value_patch = torch.from_numpy(data_cur).float().cuda()
+            data_pre_value_patch = torch.from_numpy(data_pre).float().to(opts.device)
+            data_cur_value_patch = torch.from_numpy(data_cur).float().to(opts.device)
+            data_aft_value_patch = torch.from_numpy(data_aft).float().to(opts.device)
+            data_mask_value_patch = torch.from_numpy(mask).float().to(opts.device)
 
-            data_aft_value_patch = torch.from_numpy(data_aft).float().cuda()
-
-            data_mask_value_patch = torch.from_numpy(mask).float().cuda()
-           
             start_time = time.time()
             fake_image = net_G(data_pre_value_patch,data_cur_value_patch,data_aft_value_patch,data_mask_value_patch)
             end_time=time.time()
-            fake_image_numpy = fake_image.detach().cpu().numpy()
+
+            fake_image_numpy = fake_image.float().detach().cpu().numpy()
             fake_image_numpy = np.squeeze(fake_image_numpy)*255.0
- 
-                  
+
+
             finally_image=np.squeeze(fake_image_numpy)
             mask_image = np.squeeze(mask)*255.
             os.makedirs(opt.result_path+'/result_enhanced_data/%02d'%(video_index+1),exist_ok = True)
@@ -185,38 +183,41 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
 if __name__ == "__main__":
    
     parser = argparse.ArgumentParser(description="MGANet_test")
-    parser.add_argument('--net_G', default='../model/model_epoch_AI37.pth',help="add checkpoint")
+    parser.add_argument('--net_G', default='./models/MGANet_model_AI37.pth',help="add checkpoint")
     parser.add_argument("--gpu_id", default=0, type=int, help="gpu ids (default: 0)")
     parser.add_argument("--video_nums", default=1, type=int, help="Videos number (default: 0)")
     parser.add_argument("--frame_nums", default=29, type=int, help="frame number of the video to test (default: 90)")
     parser.add_argument("--startfrm_position", default=9, type=int, help="start frame position in one video (default: 0)")
     parser.add_argument("--is_training", default=False, type=bool, help="train or test mode")
     parser.add_argument("--result_path", default='./result_AI37/', type=str, help="store results")
+    # for oob
+    parser.add_argument("--device", default='cpu', type=str, help="device")
+    parser.add_argument("--batch_size", default=1, type=int, help="batch_size")
     opts = parser.parse_args()
-    torch.cuda.set_device(opts.gpu_id)
+    opts.result_path = opts.result_path + str(os.getpid())
+    # torch.cuda.set_device(opts.gpu_id)
 
-    txt_name = './MGANet_test_data_AI37.txt'
+    txt_name = opts.result_path + '/MGANet_test_data_AI37.txt'
 
     if os.path.isfile(txt_name):
         f = open(txt_name, 'w+')  
     else:
+        os.makedirs(opts.result_path, exist_ok = True)
         os.mknod(txt_name)
         f = open(txt_name, 'w+')
 
-    one_filename = np.sort(glob.glob('../test_yuv/AI37/' + '*'))
+    one_filename = np.sort(glob.glob('./testing_set/AI37/' + '*'))
     print(one_filename)
    
     patch_size =[240,416]
     net_G = MGANet.Gen_Guided_UNet(batchNorm=False,input_size=patch_size,is_training=opts.is_training)
     net_G.eval()
-    net_G.load_state_dict(torch.load(opts.net_G,map_location=lambda storage, loc: storage.cuda(opts.gpu_id)))
+    net_G.load_state_dict(torch.load(opts.net_G, map_location='cpu'))
     print('....')
-    net_G.cuda()
+    net_G.to(opts.device)
 
     image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
     f.close()
   
-
-
 
 

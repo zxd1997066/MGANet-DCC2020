@@ -2,7 +2,8 @@ from functools import partial
 
 import torch
 import torch.nn.functional as F
-from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
+if torch.cuda.is_available():
+    from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
 
 from .utils import _single, _pair, _triple
 

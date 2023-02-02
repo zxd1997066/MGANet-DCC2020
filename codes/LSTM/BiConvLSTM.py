@@ -1,7 +1,8 @@
 import torch.nn as nn
 from torch.autograd import Variable
 import torch
-torch.cuda.set_device(0)
+if torch.cuda.is_available():
+    torch.cuda.set_device(0)
 
 class BiConvLSTMCell(nn.Module):
 
@@ -145,8 +146,8 @@ class BiConvLSTM(nn.Module):
                 init_states.append((Variable(torch.zeros(batch_size, self.hidden_dim[i], self.height, self.width).cuda()).cuda(),
                                     Variable(torch.zeros(batch_size, self.hidden_dim[i], self.height, self.width).cuda()).cuda()))
             else:
-                init_states.append((Variable(torch.zeros(batch_size, self.hidden_dim[i], self.height, self.width).cuda()).cuda(),
-                                    Variable(torch.zeros(batch_size, self.hidden_dim[i], self.height, self.width).cuda()).cuda()))
+                init_states.append((Variable(torch.zeros(batch_size, self.hidden_dim[i], self.height, self.width)),
+                                    Variable(torch.zeros(batch_size, self.hidden_dim[i], self.height, self.width))))
         return init_states
 
     @staticmethod
