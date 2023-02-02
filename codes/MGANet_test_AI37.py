@@ -130,18 +130,47 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
             height = data_pre.shape[2]
             width = data_pre.shape[3]
 
-            data_pre_value_patch = torch.from_numpy(data_pre).float().to(opts.device)
-            data_cur_value_patch = torch.from_numpy(data_cur).float().to(opts.device)
-            data_aft_value_patch = torch.from_numpy(data_aft).float().to(opts.device)
-            data_mask_value_patch = torch.from_numpy(mask).float().to(opts.device)
+            data_pre_value_patch = torch.from_numpy(data_pre).float()
+            data_cur_value_patch = torch.from_numpy(data_cur).float()
+            data_aft_value_patch = torch.from_numpy(data_aft).float()
+            data_mask_value_patch = torch.from_numpy(mask).float()
 
-            start_time = time.time()
-            fake_image = net_G(data_pre_value_patch,data_cur_value_patch,data_aft_value_patch,data_mask_value_patch)
-            end_time=time.time()
+            if opt.channels_last:
+                data_pre_value_patch = data_pre_value_patch.contiguous(memory_format=torch.channels_last)
+                data_cur_value_patch = data_cur_value_patch.contiguous(memory_format=torch.channels_last)
+                data_aft_value_patch = data_aft_value_patch.contiguous(memory_format=torch.channels_last)
+                data_mask_value_patch = data_mask_value_patch.contiguous(memory_format=torch.channels_last)
 
-            fake_image_numpy = fake_image.float().detach().cpu().numpy()
-            fake_image_numpy = np.squeeze(fake_image_numpy)*255.0
+            # H2D
+            h2d_time = time.time()
+            data_pre_value_patch.to(opts.device)
+            data_cur_value_patch.to(opts.device)
+            data_aft_value_patch.to(opts.device)
+            data_mask_value_patch.to(opts.device)
+            h2d_time = time.time() - h2d_time
+            print("H2D time: {} sec".format(h2d_time))
 
+            total_time = 0.0
+            total_sample = 0
+            for i in range(opt.num_iter):
+                elapsed = time.time()
+                fake_image = net_G(data_pre_value_patch,data_cur_value_patch,data_aft_value_patch,data_mask_value_patch)
+                if torch.cuda.is_available(): torch.cuda.synchronize()
+                elapsed = time.time() - elapsed
+                if opt.profile:
+                    opt.p.step()
+                print("Iteration: {}, inference time: {} sec.".format(i, elapsed + h2d_time), flush=True)
+                if i >= opt.num_warmup:
+                    total_time += elapsed + h2d_time
+                    total_sample += 1
+
+                fake_image_numpy = fake_image.float().detach().cpu().numpy()
+                fake_image_numpy = np.squeeze(fake_image_numpy)*255.0
+
+            throughput = total_sample / total_time
+            latency = total_time / total_sample * 1000
+            print('inference latency: %.3f ms' % latency)
+            print('inference Throughput: %f samples/s' % throughput)
 
             finally_image=np.squeeze(fake_image_numpy)
             mask_image = np.squeeze(mask)*255.
@@ -166,6 +195,7 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
             psnr_data_gt_sum+=psnr_data_gt
             print('psnr_gain:%.05f'%(psnr_gain))
             print('psnr_predict:{:.04f} psnr_anchor:{:.04f}  psnr_gain:{:.04f}'.format(psnr_pre_gt,psnr_data_gt,psnr_gain),file=f_txt)
+            break
 
         print( data_37_filename[video_index])
         print('video_index:{:2d} psnr_predict_average:{:.04f} psnr_data_average:{:.04f}  psnr_gain_average:{:.04f}'.format(video_index,psnr_pre_gt_sum/nums,psnr_data_gt_sum/nums,psnr_gain_sum/nums),file=f_txt)
@@ -174,6 +204,8 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
         ave_gain_psnr+=psnr_gain_sum/nums
         ave_psnr_predict  +=psnr_pre_gt_sum/nums
         ave_psnr_data +=psnr_data_gt_sum/nums
+        break
+
     print(' average_psnr_predict:{:.04f} average_psnr_anchor:{:.04f}  average_psnr_gain:{:0.4f}'.format(ave_psnr_predict/video_num,ave_psnr_data/video_num,ave_gain_psnr/video_num))
     print(' average_psnr_predict:{:.04f} average_psnr_anchor:{:.04f}  average_psnr_gain:{:0.4f}'.format(ave_psnr_predict/video_num,ave_psnr_data/video_num,ave_gain_psnr/video_num), file=f_txt)
 
@@ -193,6 +225,14 @@ if __name__ == "__main__":
     # for oob
     parser.add_argument("--device", default='cpu', type=str, help="device")
     parser.add_argument("--batch_size", default=1, type=int, help="batch_size")
+    parser.add_argument('--precision', type=str, default='float32', help='precision')
+    parser.add_argument('--channels_last', type=int, default=1, help='use channels last format')
+    parser.add_argument('--num_iter', type=int, default=-1, help='num_iter')
+    parser.add_argument('--num_warmup', type=int, default=-1, help='num_warmup')
+    parser.add_argument('--profile', dest='profile', action='store_true', help='profile')
+    parser.add_argument('--quantized_engine', type=str, default=None, help='quantized_engine')
+    parser.add_argument('--ipex', dest='ipex', action='store_true', help='ipex')
+    parser.add_argument('--jit', dest='jit', action='store_true', help='jit')
     opts = parser.parse_args()
     opts.result_path = opts.result_path + str(os.getpid())
     # torch.cuda.set_device(opts.gpu_id)
@@ -215,8 +255,58 @@ if __name__ == "__main__":
     net_G.load_state_dict(torch.load(opts.net_G, map_location='cpu'))
     print('....')
     net_G.to(opts.device)
+    # NHWC
+    if opts.channels_last:
+        net_G = net_G.to(memory_format=torch.channels_last)
+        print("---- Use NHWC model")
 
-    image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+    if opts.profile:
+        def trace_handler(p):
+            output = p.key_averages().table(sort_by="self_cpu_time_total")
+            print(output)
+            import pathlib
+            timeline_dir = str(pathlib.Path.cwd()) + '/timeline/'
+            if not os.path.exists(timeline_dir):
+                try:
+                    os.makedirs(timeline_dir)
+                except:
+                    pass
+            timeline_file = timeline_dir + 'timeline-' + str(torch.backends.quantized.engine) + '-' + \
+                        'MGANet-DCC2020-' + str(p.step_num) + '-' + str(os.getpid()) + '.json'
+            p.export_chrome_trace(timeline_file)
+        with torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            record_shapes=True,
+            schedule=torch.profiler.schedule(
+                wait=int(opts.num_iter/2),
+                warmup=2,
+                active=1,
+            ),
+            on_trace_ready=trace_handler,
+        ) as p:
+            opts.p = p
+            if opts.precision == "bfloat16":
+                print('---- Enable AMP bfloat16')
+                with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                    image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+            elif opts.precision == "float16":
+                print('---- Enable AMP float16')
+                with torch.cuda.amp.autocast(enabled=True, dtype=torch.float16):
+                    image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+            else:
+                image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+    else:
+        if opts.precision == "bfloat16":
+            print('---- Enable AMP bfloat16')
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+        elif opts.precision == "float16":
+            print('---- Enable AMP float16')
+            with torch.cuda.amp.autocast(enabled=True, dtype=torch.float16):
+                image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+        else:
+            image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
+
     f.close()
   
 
