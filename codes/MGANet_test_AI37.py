@@ -291,7 +291,7 @@ if __name__ == "__main__":
                     image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
             elif opts.precision == "float16":
                 print('---- Enable AMP float16')
-                with torch.cuda.amp.autocast(enabled=True, dtype=torch.float16):
+                with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
                     image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
             else:
                 image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
@@ -302,7 +302,7 @@ if __name__ == "__main__":
                 image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
         elif opts.precision == "float16":
             print('---- Enable AMP float16')
-            with torch.cuda.amp.autocast(enabled=True, dtype=torch.float16):
+            with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
                 image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
         else:
             image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
