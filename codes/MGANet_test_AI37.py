@@ -150,6 +150,8 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
             h2d_time = time.time() - h2d_time
             print("H2D time: {} sec".format(h2d_time))
 
+            if opt.compile:
+                model = torch.compile(model, backend=opt.backend, options={"freezing": True})
             total_time = 0.0
             total_sample = 0
             for i in range(opt.num_iter):
@@ -233,6 +235,10 @@ if __name__ == "__main__":
     parser.add_argument('--quantized_engine', type=str, default=None, help='quantized_engine')
     parser.add_argument('--ipex', dest='ipex', action='store_true', help='ipex')
     parser.add_argument('--jit', dest='jit', action='store_true', help='jit')
+    parser.add_argument("--compile", action='store_true', default=False,
+                    help="enable torch.compile")
+    parser.add_argument("--backend", type=str, default='inductor',
+                    help="enable torch.compile backend")
     opts = parser.parse_args()
     opts.result_path = opts.result_path + str(os.getpid())
     # torch.cuda.set_device(opts.gpu_id)
