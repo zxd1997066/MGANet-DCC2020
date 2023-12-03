@@ -151,7 +151,11 @@ def image_test(one_filename,net_G,patch_size=[128,128],f_txt=None,opt=None):
             print("H2D time: {} sec".format(h2d_time))
 
             if opt.compile:
-                model = torch.compile(model, backend=opt.backend, options={"freezing": True})
+                data_pre_value_patch = torch.compile(data_pre_value_patch, backend=opt.backend, options={"freezing": True})
+                data_cur_value_patch = torch.compile(data_cur_value_patch, backend=opt.backend, options={"freezing": True})
+                data_aft_value_patch = torch.compile(data_aft_value_patch, backend=opt.backend, options={"freezing": True})
+                data_mask_value_patch = torch.compile(data_mask_value_patch, backend=opt.backend, options={"freezing": True})
+                
             total_time = 0.0
             total_sample = 0
             for i in range(opt.num_iter):
