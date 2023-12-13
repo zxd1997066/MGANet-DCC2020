@@ -297,22 +297,22 @@ if __name__ == "__main__":
             opts.p = p
             if opts.precision == "bfloat16":
                 print('---- Enable AMP bfloat16')
-                with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+                with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.bfloat16):
                     image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
             elif opts.precision == "float16":
                 print('---- Enable AMP float16')
-                with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+                with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.half):
                     image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
             else:
                 image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
     else:
         if opts.precision == "bfloat16":
             print('---- Enable AMP bfloat16')
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.bfloat16):
                 image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
         elif opts.precision == "float16":
             print('---- Enable AMP float16')
-            with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+            with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.half):
                 image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
         else:
             image_test(one_filename=one_filename,net_G=net_G,patch_size=patch_size,f_txt = f,opt = opts)
