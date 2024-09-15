@@ -243,6 +243,8 @@ if __name__ == "__main__":
                     help="enable torch.compile")
     parser.add_argument("--backend", type=str, default='inductor',
                     help="enable torch.compile backend")
+    parser.add_argument("--triton_cpu", action='store_true', default=False,
+                    help="enable triton_cpu")
     opts = parser.parse_args()
     opts.result_path = opts.result_path + str(os.getpid())
     # torch.cuda.set_device(opts.gpu_id)
@@ -265,6 +267,10 @@ if __name__ == "__main__":
     net_G.load_state_dict(torch.load(opts.net_G, map_location='cpu'))
     print('....')
     net_G.to(opts.device)
+    if opts.triton_cpu:
+        print("run with triton cpu backend")
+        import torch._inductor.config
+        torch._inductor.config.cpu_backend="triton"
     # NHWC
     if opts.channels_last:
         net_G = net_G.to(memory_format=torch.channels_last)
