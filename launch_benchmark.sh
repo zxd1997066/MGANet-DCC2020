@@ -17,7 +17,7 @@ function main {
         exit 1
         set -x
     fi
-    pip install -U scikit-image==0.17.2 opencv-python==4.8.0.74
+    pip install -U scikit-image opencv-python==4.8.0.74
 
     # if multiple use 'xxx,xxx,xxx'
     model_name_list=($(echo "${model_name}" |sed 's/,/ /g'))
