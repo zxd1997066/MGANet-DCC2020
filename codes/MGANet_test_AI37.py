@@ -3,7 +3,7 @@
 import numpy as np
 from numpy import *
 # from scipy.misc import imresize
-from skimage.measure import compare_ssim
+from skimage.metrics import structural_similarity
 import cv2
 import glob
 import time
